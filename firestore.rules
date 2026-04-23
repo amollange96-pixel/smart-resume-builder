@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: resumes
+    // Document ID: resumeId
+    // Fields:
+    //   - id: string (required)
+    //   - userId: string (required, matches owner)
+    //   - fileName: string (required)
+    //   - fileType: string (required)
+    //   - uploadDate: timestamp (required)
+    //   - content: string (required)
+    //
+    // Collection: analysisResults
+    // Document ID: analysisId
+    // Fields:
+    //   - id: string (required)
+    //   - resumeId: string (required)
+    //   - userId: string (required, matches owner)
+    //   - jobDescription: string (optional)
+    //   - score: number (required, 0-100)
+    //   - breakdown: map (required)
+    //   - missingSkills: list (optional)
+    //   - weaknesses: list (optional)
+    //   - suggestions: list (optional)
+    //   - optimizedContent: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "amollange96@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(data, allowedFields) {
+      return data.keys().hasOnly(allowedFields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(data, ['uid', 'email', 'displayName', 'photoURL', 'createdAt', 'role']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.email is string && isValidEmail(data.email) &&
+             data.createdAt is timestamp &&
+             (!('role' in data) || (data.role in ['user', 'admin']));
+    }
+
+    function isValidResume(data) {
+      return hasOnlyAllowedFields(data, ['id', 'userId', 'fileName', 'fileType', 'uploadDate', 'content']) &&
+             (!('id' in data) || data.id is string) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.fileName is string && data.fileName.size() <= 256 &&
+             data.fileType is string &&
+             data.uploadDate is timestamp &&
+             data.content is string && data.content.size() <= 1048576; // 1MB limit
+    }
+
+    function isValidAnalysisResult(data) {
+      return hasOnlyAllowedFields(data, ['id', 'resumeId', 'userId', 'jobDescription', 'score', 'breakdown', 'missingSkills', 'weaknesses', 'suggestions', 'optimizedContent', 'createdAt']) &&
+             (!('id' in data) || data.id is string) &&
+             data.resumeId is string &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.score is number && data.score >= 0 && data.score <= 100 &&
+             data.breakdown is map &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /resumes/{resumeId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidResume(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidResume(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /analysisResults/{analysisId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidAnalysisResult(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidAnalysisResult(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
