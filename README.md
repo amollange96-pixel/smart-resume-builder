@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="1200" height="475" alt="AI Resume Optimizer Banner"  />
+
 
 # 🚀 AI Resume Optimizer & ATS Analyzer
 
