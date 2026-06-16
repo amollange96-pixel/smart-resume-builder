@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["uid", "email"]
+    },
+    "Resume": {
+      "title": "Resume",
+      "description": "Metadata for an uploaded resume",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "uploadDate": { "type": "string", "format": "date-time" },
+        "content": { "type": "string", "description": "Extracted text content" }
+      },
+      "required": ["id", "userId", "fileName", "content"]
+    },
+    "AnalysisResult": {
+      "title": "AnalysisResult",
+      "description": "ATS analysis and scoring results",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "resumeId": { "type": "string" },
+        "userId": { "type": "string" },
+        "jobDescription": { "type": "string" },
+        "score": { "type": "number" },
+        "breakdown": {
+          "type": "object",
+          "properties": {
+            "skillsMatch": { "type": "number" },
+            "experienceMatch": { "type": "number" },
+            "keywordDensity": { "type": "number" },
+            "formatting": { "type": "number" },
+            "grammar": { "type": "number" }
+          }
+        },
+        "missingSkills": { "type": "array", "items": { "type": "string" } },
+        "weaknesses": { "type": "array", "items": { "type": "string" } },
+        "suggestions": { "type": "array", "items": { "type": "string" } },
+        "optimizedContent": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "resumeId", "userId", "score"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/resumes/{resumeId}": {
+      "schema": "Resume",
+      "description": "Uploaded resume documents"
+    },
+    "/analysisResults/{analysisId}": {
+      "schema": "AnalysisResult",
+      "description": "Analysis results for resumes"
+    }
+  }
+}
